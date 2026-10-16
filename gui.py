@@ -14,7 +14,7 @@ class LolInterpreterGUI:
         self.build_execute_button()
         self.build_console()
 
-    # (1) file explorer
+    # file explorer
     def build_top_bar(self):
         bar = tk.Frame(self.root)
         bar.pack(fill="x", padx=5, pady=5)
@@ -26,13 +26,13 @@ class LolInterpreterGUI:
         panels = tk.PanedWindow(self.root, orient="horizontal")
         panels.pack(fill="both", expand=True, padx=5)
 
-        # (2) text editor
+        # text editor
         self.editor = scrolledtext.ScrolledText(panels, width=40, undo=True)
         panels.add(self.editor)
 
-        # (3) list of tokens
+        # list of tokens
         self.token_table = self.make_table(panels, ("Lexeme", "Classification"))
-        # (4) symbol table
+        # symbol table
         self.symbol_table = self.make_table(panels, ("Identifier", "Value"))
 
     def make_table(self, parent, columns):
@@ -48,11 +48,11 @@ class LolInterpreterGUI:
         parent.add(frame)
         return table
 
-    # (5) execute button
+    # execute button
     def build_execute_button(self):
         tk.Button(self.root, text="EXECUTE", command=self.execute).pack(fill="x", padx=5, pady=5)
 
-    # (6) console
+    # console
     def build_console(self):
         self.console = scrolledtext.ScrolledText(self.root, height=10, state="disabled")
         self.console.pack(fill="x", padx=5, pady=(0, 5))
