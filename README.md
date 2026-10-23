@@ -11,10 +11,6 @@ tkinter comes with the standard python install so nothing else is needed
 
     python lexer.py tests/sample2.lol
 
-## run the automated tests
-
-    python -m unittest discover tests
-
 ## files
 
     lexer.py        lexical analyzer
