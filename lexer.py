@@ -4,8 +4,6 @@
 # every token has a lexeme a classification and a line number
 # anything that is not a valid lexeme is reported in the error list
 #
-# how to use it from other files
-#     tokens, errors = tokenize(source_code)
 #
 # how to test it from the terminal
 #     python lexer.py tests/sample1.lol
@@ -138,6 +136,7 @@ class Token:
 
 # small helper functions
 
+# check if a character is whitespace or one of the word enders
 def is_word_end(character):
     return character.isspace() or character in WORD_ENDERS
 
@@ -147,7 +146,7 @@ def keyword_ends_cleanly(line, end):
     # this stops the keyword R from matching the start of a name like result
     return end == len(line) or line[end].isspace()
 
-
+# find a keyword in the line starting at the given position
 def find_keyword(line, position):
     # return the keyword that starts at this position or none
     for keyword in SORTED_KEYWORDS:
@@ -159,7 +158,7 @@ def find_keyword(line, position):
             return keyword
     return None
 
-
+# the main class that does the lexical analysis
 class Lexer:
     def __init__(self, source):
         self.lines = source.splitlines()
