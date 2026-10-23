@@ -1,5 +1,5 @@
 # gui.py
-# graphical user interface for the lolcode interpreter
+# graphical user interface for the lolcode interpreter in dark mode
 #
 # parts of the window
 #     file explorer button on the top
@@ -15,12 +15,23 @@ from tkinter import ttk, filedialog, scrolledtext
 from lexer import tokenize
 
 
+# dark mode colors
+BACKGROUND = "#1e1e1e"
+PANEL = "#252526"
+TEXT = "#d4d4d4"
+BUTTON = "#3c3c3c"
+SELECTION = "#264f78"
+ERROR = "#f48771"
+
+
 class LolInterpreterGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("LOLCode Interpreter")
         self.root.geometry("1100x700")
+        self.root.configure(bg=BACKGROUND)
 
+        self.apply_dark_theme()
         self.build_file_explorer()
         self.build_panels()
         self.build_execute_button()
@@ -28,27 +39,48 @@ class LolInterpreterGUI:
 
     # building the window
 
+    def apply_dark_theme(self):
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        style.configure("Treeview", background=PANEL, fieldbackground=PANEL,
+                        foreground=TEXT, borderwidth=0)
+        style.map("Treeview", background=[("selected", SELECTION)])
+        style.configure("Treeview.Heading", background=BUTTON, foreground=TEXT,
+                        borderwidth=0)
+
+        style.configure("Vertical.TScrollbar", background=BUTTON,
+                        troughcolor=BACKGROUND, bordercolor=BACKGROUND)
+
+        style.configure("TButton", background=BUTTON, foreground=TEXT,
+                        borderwidth=0, padding=6)
+        style.map("TButton", background=[("active", SELECTION)])
+
     def build_file_explorer(self):
-        bar = tk.Frame(self.root)
+        bar = tk.Frame(self.root, bg=BACKGROUND)
         bar.pack(fill="x", padx=5, pady=5)
 
-        self.file_label = tk.Label(bar, text="(None)", anchor="w")
+        self.file_label = tk.Label(bar, text="(None)", anchor="w",
+                                   bg=BACKGROUND, fg=TEXT)
         self.file_label.pack(side="left", fill="x", expand=True)
 
-        tk.Button(bar, text="Open File", command=self.open_file).pack(side="right")
+        ttk.Button(bar, text="Open File", command=self.open_file).pack(side="right")
 
     def build_panels(self):
-        panels = tk.PanedWindow(self.root, orient="horizontal")
+        panels = tk.PanedWindow(self.root, orient="horizontal", bg=BACKGROUND)
         panels.pack(fill="both", expand=True, padx=5)
 
-        self.editor = scrolledtext.ScrolledText(panels, width=40, undo=True)
+        # insertbackground is the color of the typing cursor
+        self.editor = scrolledtext.ScrolledText(panels, width=40, undo=True,
+                                                bg=PANEL, fg=TEXT,
+                                                insertbackground=TEXT)
         panels.add(self.editor)
 
         self.token_table = self.make_table(panels, ("Lexeme", "Classification"))
         self.symbol_table = self.make_table(panels, ("Identifier", "Value"))
 
     def make_table(self, panels, columns):
-        frame = tk.Frame(panels)
+        frame = tk.Frame(panels, bg=BACKGROUND)
         table = ttk.Treeview(frame, columns=columns, show="headings")
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=table.yview)
         table.configure(yscrollcommand=scrollbar.set)
@@ -63,10 +95,12 @@ class LolInterpreterGUI:
         return table
 
     def build_execute_button(self):
-        tk.Button(self.root, text="EXECUTE", command=self.execute).pack(fill="x", padx=5, pady=5)
+        ttk.Button(self.root, text="EXECUTE", command=self.execute).pack(fill="x", padx=5, pady=5)
 
     def build_console(self):
-        self.console = scrolledtext.ScrolledText(self.root, height=10, state="disabled")
+        self.console = scrolledtext.ScrolledText(self.root, height=10, state="disabled",
+                                                 bg=PANEL, fg=TEXT)
+        self.console.tag_config("error", foreground=ERROR)
         self.console.pack(fill="x", padx=5, pady=(0, 5))
 
     # button actions
@@ -96,7 +130,7 @@ class LolInterpreterGUI:
             self.token_table.insert("", tk.END, values=(token.lexeme, token.classification))
 
         for error in errors:
-            self.write_console("error: " + error)
+            self.write_console("error: " + error, "error")
 
         # the symbol table stays empty until the semantic analyzer is done
         if not errors:
@@ -113,7 +147,7 @@ class LolInterpreterGUI:
         self.console.delete("1.0", tk.END)
         self.console.config(state="disabled")
 
-    def write_console(self, text):
+    def write_console(self, text, tag=None):
         self.console.config(state="normal")
-        self.console.insert(tk.END, text + "\n")
+        self.console.insert(tk.END, text + "\n", tag)
         self.console.config(state="disabled")
