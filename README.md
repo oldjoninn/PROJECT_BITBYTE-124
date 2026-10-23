@@ -1,13 +1,28 @@
-# LOLCode Interpreter (CMSC 124)
+# lolcode interpreter for cmsc 124 final project
 
-Language: Python 3
+language: python 3
+tkinter comes with the standard python install so nothing else is needed
 
-Run the gui:
+## run the interpreter
 
     python main.py
 
-Test the lexer from the terminal:
+## test the lexical analyzer from the terminal
 
-    python lexer.py tests/sample1.lol
+    python lexer.py tests/sample2.lol
 
-Status: lexical analyzer in progress
+## run the automated tests
+
+    python -m unittest discover tests
+
+## files
+
+    lexer.py        lexical analyzer
+    gui.py          graphical user interface
+    main.py         starts the gui
+    tests/          sample programs and unit tests
+
+## status
+
+lexical analyzer is done
+syntax analyzer and semantic analyzer are not started yet
