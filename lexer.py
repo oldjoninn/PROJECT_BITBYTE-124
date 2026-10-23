@@ -106,7 +106,6 @@ KEYWORDS = {
 SORTED_KEYWORDS = sorted(KEYWORDS, key=len, reverse=True)
 
 # keywords made of symbols may touch the lexeme before or after them
-# for example a string followed by an exclamation mark
 SYMBOL_KEYWORDS = {"!", "+"}
 
 # a word stops at whitespace or at one of these characters
@@ -126,6 +125,7 @@ IDENTIFIER_KINDS = {
     "IM IN YR": "Loop Identifier",
     "IM OUTTA YR": "Loop Identifier",
 }
+# the default kind is a variable identifier
 DEFAULT_IDENTIFIER_KIND = "Variable Identifier"
 
 
@@ -200,6 +200,7 @@ class Lexer:
     # each scan method returns the position where scanning continues
     # returning the length of the line means the rest of the line is skipped
 
+    # scan a line of code
     def scan_line(self, line, line_number):
         position = 0
         while position < len(line):
@@ -212,6 +213,7 @@ class Lexer:
             else:
                 position = self.scan_keyword_or_word(line, position, line_number)
 
+    # scan a string literal
     def scan_string(self, line, position, line_number):
         closing_quote = line.find('"', position + 1)
 
@@ -225,12 +227,14 @@ class Lexer:
         self.add_token('"', "String Delimiter", line_number)
         return closing_quote + 1
 
+    # scan a keyword or a word
     def scan_keyword_or_word(self, line, position, line_number):
         keyword = find_keyword(line, position)
         if keyword is None:
             return self.scan_word(line, position, line_number)
         return self.scan_keyword(keyword, line, position, line_number)
 
+    # scan a keyword
     def scan_keyword(self, keyword, line, position, line_number):
         end = position + len(keyword)
 
@@ -248,6 +252,7 @@ class Lexer:
         self.add_token(keyword, KEYWORDS[keyword], line_number)
         return end
 
+    # scan a word
     def scan_word(self, line, position, line_number):
         end = position
         while end < len(line) and not is_word_end(line[end]):
@@ -263,6 +268,7 @@ class Lexer:
 
         return end
 
+    # classify a word using regexes and the previous token on the same line
     def classify_word(self, word, line_number):
         # numbar is checked before numbr so a decimal is never split
         if NUMBAR_PATTERN.fullmatch(word):
@@ -277,6 +283,7 @@ class Lexer:
             return self.identifier_kind(line_number)
         return None
 
+    # determine the kind of identifier based on the previous token on the same line
     def identifier_kind(self, line_number):
         previous = self.previous_token_on_line(line_number)
         if previous is None:
@@ -285,6 +292,7 @@ class Lexer:
 
     # multi line comments
 
+    # start a multi-line comment
     def start_multiline_comment(self, line, line_number):
         # obtw must be the first lexeme on its line
         if self.previous_token_on_line(line_number) is not None:
@@ -296,6 +304,7 @@ class Lexer:
         self.multiline_comment_start = line_number
         return len(line)
 
+    # scan a line inside a multi-line comment
     def scan_comment_line(self, line, line_number):
         # every line inside the comment is ignored until a line starts with tldr
         words = line.split()
@@ -310,20 +319,23 @@ class Lexer:
         if leftover and leftover[0] != "BTW":
             self.add_error(line_number, "tldr must be alone on its line")
 
-
+# the main function for other files to use
 def tokenize(source):
     # returns a list of tokens and a list of error messages
     return Lexer(source).tokenize()
 
 
+# the main function for testing from the terminal
 if __name__ == "__main__":
+    # check that the user provided a file name
     if len(sys.argv) != 2:
         print("usage: python lexer.py <file.lol>")
         sys.exit(1)
-
+    # read the source code from the file and tokenize it
     with open(sys.argv[1], "r") as source_file:
         tokens, errors = tokenize(source_file.read())
 
+    # print the results in a table format
     print(f"{'LINE':<6}{'LEXEME':<20}CLASSIFICATION")
     for token in tokens:
         print(f"{token.line:<6}{token.lexeme:<20}{token.classification}")
