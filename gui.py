@@ -13,6 +13,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext
 
 from lexer import tokenize
+from parse_tree import print_tree
+from syntax_analyzer import parse
 
 
 # dark mode colors
@@ -119,6 +121,7 @@ class LolInterpreterGUI:
 
     def execute(self):
         # everything is refreshed every time the button is pressed
+        # the symbol table stays empty until the semantic analyzer is done
         self.clear_table(self.token_table)
         self.clear_table(self.symbol_table)
         self.clear_console()
@@ -131,10 +134,18 @@ class LolInterpreterGUI:
 
         for error in errors:
             self.write_console("error: " + error, "error")
+        if errors:
+            return
+        self.write_console(f"lexical analysis done with {len(tokens)} tokens")
 
-        # the symbol table stays empty until the semantic analyzer is done
-        if not errors:
-            self.write_console(f"lexical analysis done with {len(tokens)} tokens")
+        # the parser only runs when there are no lexical errors
+        tree, errors = parse(tokens)
+        for error in errors:
+            self.write_console("syntax error: " + error, "error")
+        if errors:
+            return
+        self.write_console("syntax analysis done, the parse tree is printed in the terminal")
+        print_tree(tree)
 
     # small helpers
 
