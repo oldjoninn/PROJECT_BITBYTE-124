@@ -32,7 +32,6 @@ def format_tree(node, depth=0):
 
 
 def print_tree(node):
-    # a yarn may hold characters the terminal cannot show (like an emoji on a
-    # windows console), so those are escaped instead of crashing the print
+    # if it cant print a special character, it will default into a backslash-escaped representation
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
     print(format_tree(node).encode(encoding, "backslashreplace").decode(encoding))
