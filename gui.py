@@ -5,7 +5,7 @@
 #     file explorer button on the top
 #     text editor on the left
 #     list of tokens in the middle
-#     symbol table on the right
+#     symbol table and parse tree in tabs on the right
 #     execute button below the panels
 #     console at the bottom
 
@@ -13,7 +13,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext
 
 from lexer import tokenize
-from parse_tree import print_tree
+from parse_tree import node_label
 from syntax_analyzer import parse
 
 
@@ -79,11 +79,22 @@ class LolInterpreterGUI:
         panels.add(self.editor)
 
         self.token_table = self.make_table(panels, ("Lexeme", "Classification"))
-        self.symbol_table = self.make_table(panels, ("Identifier", "Value"))
+        panels.add(self.token_table.master)
 
-    def make_table(self, panels, columns):
-        frame = tk.Frame(panels, bg=BACKGROUND)
-        table = ttk.Treeview(frame, columns=columns, show="headings")
+        # the right side has one tab for the symbol table and one for the parse tree
+        self.right_tabs = ttk.Notebook(panels)
+        self.symbol_table = self.make_table(self.right_tabs, ("Identifier", "Value"))
+        self.right_tabs.add(self.symbol_table.master, text="Symbol Table")
+
+        # show="tree" gives the collapsible tree look instead of column headings
+        self.parse_tree_view = self.make_table(self.right_tabs, (), show="tree")
+        self.parse_tree_view.column("#0", width=300)
+        self.right_tabs.add(self.parse_tree_view.master, text="Parse Tree")
+        panels.add(self.right_tabs)
+
+    def make_table(self, parent, columns, show="headings"):
+        frame = tk.Frame(parent, bg=BACKGROUND)
+        table = ttk.Treeview(frame, columns=columns, show=show)
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=table.yview)
         table.configure(yscrollcommand=scrollbar.set)
 
@@ -93,7 +104,6 @@ class LolInterpreterGUI:
 
         table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        panels.add(frame)
         return table
 
     def build_execute_button(self):
@@ -124,6 +134,7 @@ class LolInterpreterGUI:
         # the symbol table stays empty until the semantic analyzer is done
         self.clear_table(self.token_table)
         self.clear_table(self.symbol_table)
+        self.clear_table(self.parse_tree_view)
         self.clear_console()
 
         source = self.editor.get("1.0", tk.END)
@@ -144,10 +155,17 @@ class LolInterpreterGUI:
             self.write_console("syntax error: " + error, "error")
         if errors:
             return
-        self.write_console("syntax analysis done, the parse tree is printed in the terminal")
-        print_tree(tree)
+        self.write_console("syntax analysis done")
+        self.show_tree(tree)
+        self.right_tabs.select(self.parse_tree_view.master)
 
     # small helpers
+
+    def show_tree(self, node, parent=""):
+        # each node becomes a row under its parent and every row starts expanded
+        row = self.parse_tree_view.insert(parent, tk.END, text=node_label(node), open=True)
+        for child in node.children:
+            self.show_tree(child, row)
 
     def clear_table(self, table):
         for row in table.get_children():

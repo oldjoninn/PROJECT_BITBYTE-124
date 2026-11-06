@@ -14,18 +14,20 @@ class Node:
     token: Token = None
 
 
+def node_label(node):
+    # the text shown for one node, used by the terminal printer and the gui
+    if node.token is None:
+        return f"<{node.kind}>"
+    if node.kind == "yarn":
+        return f'yarn: "{node.token.lexeme}"'
+    if node.kind == node.token.lexeme:
+        return node.kind
+    return f"{node.kind}: {node.token.lexeme}"
+
+
 def format_tree(node, depth=0):
     # plain ascii with two spaces per level so it prints on any terminal
-    if node.token is None:
-        label = f"<{node.kind}>"
-    elif node.kind == "yarn":
-        label = f'yarn: "{node.token.lexeme}"'
-    elif node.kind == node.token.lexeme:
-        label = node.kind
-    else:
-        label = f"{node.kind}: {node.token.lexeme}"
-
-    lines = ["  " * depth + label]
+    lines = ["  " * depth + node_label(node)]
     for child in node.children:
         lines.append(format_tree(child, depth + 1))
     return "\n".join(lines)
