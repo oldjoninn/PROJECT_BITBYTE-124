@@ -3,7 +3,7 @@ HAI
 		I HAS A choice
 		I HAS A input
 	BUHBYE
-	
+	 
 	BTW if w/o MEBBE, 1 only, everything else is invalid
 	VISIBLE "1. Compute age"
 	VISIBLE "2. Compute tip"
