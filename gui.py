@@ -5,15 +5,17 @@
 #     file explorer button on the top
 #     text editor on the left
 #     list of tokens in the middle
-#     symbol table and parse tree in tabs on the right
+#     symbol table on the right
 #     execute button below the panels
 #     console at the bottom
 
 import tkinter as tk
-from tkinter import ttk, filedialog, scrolledtext
+from tkinter import ttk, filedialog, scrolledtext, simpledialog
 
 from lexer import tokenize
-from parse_tree import node_label
+from parse_tree import print_tree
+from runtime_values import SemanticError
+from semantic_analyzer import Interpreter
 from syntax_analyzer import parse
 
 
@@ -79,22 +81,11 @@ class LolInterpreterGUI:
         panels.add(self.editor)
 
         self.token_table = self.make_table(panels, ("Lexeme", "Classification"))
-        panels.add(self.token_table.master)
+        self.symbol_table = self.make_table(panels, ("Identifier", "Value"))
 
-        # the right side has one tab for the symbol table and one for the parse tree
-        self.right_tabs = ttk.Notebook(panels)
-        self.symbol_table = self.make_table(self.right_tabs, ("Identifier", "Value"))
-        self.right_tabs.add(self.symbol_table.master, text="Symbol Table")
-
-        # show="tree" gives the collapsible tree look instead of column headings
-        self.parse_tree_view = self.make_table(self.right_tabs, (), show="tree")
-        self.parse_tree_view.column("#0", width=300)
-        self.right_tabs.add(self.parse_tree_view.master, text="Parse Tree")
-        panels.add(self.right_tabs)
-
-    def make_table(self, parent, columns, show="headings"):
-        frame = tk.Frame(parent, bg=BACKGROUND)
-        table = ttk.Treeview(frame, columns=columns, show=show)
+    def make_table(self, panels, columns):
+        frame = tk.Frame(panels, bg=BACKGROUND)
+        table = ttk.Treeview(frame, columns=columns, show="headings")
         scrollbar = ttk.Scrollbar(frame, orient="vertical", command=table.yview)
         table.configure(yscrollcommand=scrollbar.set)
 
@@ -104,6 +95,7 @@ class LolInterpreterGUI:
 
         table.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        panels.add(frame)
         return table
 
     def build_execute_button(self):
@@ -131,10 +123,8 @@ class LolInterpreterGUI:
 
     def execute(self):
         # everything is refreshed every time the button is pressed
-        # the symbol table stays empty until the semantic analyzer is done
         self.clear_table(self.token_table)
         self.clear_table(self.symbol_table)
-        self.clear_table(self.parse_tree_view)
         self.clear_console()
 
         source = self.editor.get("1.0", tk.END)
@@ -155,17 +145,42 @@ class LolInterpreterGUI:
             self.write_console("syntax error: " + error, "error")
         if errors:
             return
-        self.write_console("syntax analysis done")
-        self.show_tree(tree)
-        self.right_tabs.select(self.parse_tree_view.master)
+        self.write_console("syntax analysis done, the parse tree is printed in the terminal")
+        print_tree(tree)
+
+        # the program only runs when there are no syntax errors
+        self.interpreter = Interpreter({"output": self.write_output, "input": self.ask_input})
+        try:
+            self.interpreter.execute(tree)
+        except SemanticError as error:
+            self.write_console(str(error), "error")
+        # the symbol table also shows the values reached before an error
+        self.show_symbol_table()
+
+    # program input and output
+
+    def write_output(self, text):
+        # VISIBLE text already ends with its own newline, or none after !
+        self.console.config(state="normal")
+        self.console.insert(tk.END, text)
+        self.console.config(state="disabled")
+
+    def ask_input(self, prompt):
+        # GIMMEH opens a dialog; the symbol table is refreshed first so it shows the current values
+        self.show_symbol_table()
+        entered = simpledialog.askstring("GIMMEH", prompt, parent=self.root)
+        if entered is None:
+            entered = ""
+        self.write_output(prompt + entered + "\n")
+        return entered
+
+    def show_symbol_table(self):
+        self.clear_table(self.symbol_table)
+        symbols = self.interpreter.get_symbol_table()
+        for name in symbols:
+            self.symbol_table.insert("", tk.END, values=(name, symbols[name]))
 
     # small helpers
-
-    def show_tree(self, node, parent=""):
-        # each node becomes a row under its parent and every row starts expanded
-        row = self.parse_tree_view.insert(parent, tk.END, text=node_label(node), open=True)
-        for child in node.children:
-            self.show_tree(child, row)
 
     def clear_table(self, table):
         for row in table.get_children():
