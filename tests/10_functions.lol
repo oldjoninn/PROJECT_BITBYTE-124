@@ -21,14 +21,14 @@ HAI
     GIMMEH num1
     GIMMEH num2
 
-    I IZ addNum YR num1 AN YR num2
+    I IZ addNum YR num1 AN YR num2 
     VISIBLE IT
 
     GIMMEH name
-    I IZ printName YR name
+    I IZ printName YR name 
     VISIBLE IT
 
-    I IZ printNum YR SUM OF num1 AN 2
+    I IZ printNum YR SUM OF num1 AN 2 
     VISIBLE IT
 
 KTHXBYE

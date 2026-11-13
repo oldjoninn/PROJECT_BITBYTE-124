@@ -7,53 +7,37 @@ tkinter comes with the standard python install so nothing else is needed
 
     python main.py
 
-open a .lol file with the open file button then press execute
-the lexemes show in the middle panel and errors show in the console
-if there are no lexical errors the syntax analyzer runs next and the parse tree is printed in the terminal
-
-## test from the terminal
-
-lexical analyzer
+## test the lexical analyzer from the terminal
 
     python lexer.py tests/sample2.lol
 
-syntax analyzer
+## test the syntax analyzer from the terminal
 
-    python syntax_analyzer.py tests/10_functions.lol
+    python syntax_analyzer.py tests/sample2.lol
+
+it prints the parse tree, or the first syntax error with its line number
+
+## run the unit tests
+
+    python -m unittest discover tests
 
 ## files
 
-    main.py              starts the gui
-    gui.py               graphical user interface in dark mode
-    lexer.py             lexical analyzer
-    keywords.py          keyword groups used by the syntax analyzer
-    syntax_analyzer.py   syntax analyzer (recursive descent, one method per grammar rule)
-    parse_tree.py        parse tree node and tree printer
-    tests/               sample programs
-
-## how it works
-
-1. the lexer turns the source into tokens with a lexeme, classification and line number
-2. the syntax analyzer checks the tokens against the grammar and builds a parse tree
-3. the first syntax error stops the parse and is reported with its line number
-
-## tests
-
-    01_variables.lol    04_smoosh_assign.lol   07_ifelse.lol     10_functions.lol
-    02_gimmeh.lol       05_bool.lol            08_switch.lol     errors.lol
-    03_arith.lol        06_comparison.lol      09_loops.lol      sample1.lol, sample2.lol
-
-errors.lol has programs with lexical errors for testing the error messages
+    lexer.py            lexical analyzer
+    syntax_analyzer.py  syntax analyzer (recursive descent parser)
+    keywords.py         keyword groups the syntax analyzer uses
+    parse_tree.py       parse tree node and tree printing
+    semantic_analyzer.py  runs the program: statements, flow control, functions, symbol table
+    expressions.py      evaluates expressions
+    type_casting.py     typecasting rules
+    runtime_values.py   values, scopes and the semantic error
+    gui.py              graphical user interface
+    main.py             starts the gui
+    specs/grammar.md    the grammar the syntax analyzer follows
+    tests/              sample programs and unit tests
 
 ## status
 
-- lexical analyzer: done
-- syntax analyzer: done, prints the parse tree in the terminal
-- semantic analyzer: not started yet, the symbol table stays empty until it is done
-
-## group
-
-- Ralph Crisostomo
-- Jorge Paguirigan
-- Geoseffe Rufo
-- Raymond Sarino
+lexical analyzer is done
+syntax analyzer is done (milestone 2)
+semantic analyzer is done (milestone 3): the gui shows the program output, asks for GIMMEH input in a dialog, and fills the symbol table
