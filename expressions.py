@@ -6,6 +6,35 @@ from runtime_values import Value
 from type_casting import TypeCaster
 
 
+# extra credit: special characters in a YARN, written with a colon
+YARN_SPECIAL_CHARACTERS = {")": "\n", ">": "\t", "o": "\a", ":": ":"}
+HEX_DIGITS = "0123456789abcdefABCDEF"
+
+
+def decode_yarn(raw):
+    # :) newline, :> tab, :o bell, :: colon, :(hex) unicode code point
+    # any other colon stays as typed; :" is left out because "x:" + WIN must still close the yarn
+    text = []
+    index = 0
+    while index < len(raw):
+        code = raw[index + 1:index + 2]
+        if raw[index] == ":" and code in YARN_SPECIAL_CHARACTERS:
+            text.append(YARN_SPECIAL_CHARACTERS[code])
+            index += 2
+            continue
+        if raw[index] == ":" and code == "(":
+            close = raw.find(")", index)
+            digits = raw[index + 2:close]
+            is_hex = close != -1 and digits and all(digit in HEX_DIGITS for digit in digits)
+            if is_hex and int(digits, 16) <= 0x10FFFF:
+                text.append(chr(int(digits, 16)))
+                index = close + 1
+                continue
+        text.append(raw[index])
+        index += 1
+    return "".join(text)
+
+
 def truncating_divide(a, b):
     # exact integer division rounded toward zero, with no float in between
     quotient = abs(a) // abs(b)
@@ -34,7 +63,7 @@ class ExpressionEvaluator(TypeCaster):
         return Value("TROOF", self.get_node_lexeme(node) == "WIN")
 
     def visit_yarn(self, node):
-        return Value("YARN", str(self.get_node_lexeme(node)))
+        return Value("YARN", decode_yarn(self.get_node_lexeme(node)))
 
     def visit_arith(self, node):
         if len(node.children) < 3:
