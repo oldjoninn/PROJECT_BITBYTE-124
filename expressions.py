@@ -1,7 +1,17 @@
 # evaluates LOLCode expressions: variables, literals, arithmetic, boolean, comparison, SMOOSH and MAEK.
 
+import math
+
 from runtime_values import Value
 from type_casting import TypeCaster
+
+
+def truncating_divide(a, b):
+    # exact integer division rounded toward zero, with no float in between
+    quotient = abs(a) // abs(b)
+    if (a >= 0) == (b >= 0):
+        return quotient
+    return -quotient
 
 
 # the second layer of the interpreter
@@ -51,11 +61,14 @@ class ExpressionEvaluator(TypeCaster):
             # two NUMBRs divide to a NUMBR, rounded toward zero
             if result_type == "NUMBAR":
                 return a / b
-            return int(a / b)
+            return truncating_divide(a, b)
         if operator == "MOD OF":
             if b == 0:
                 self._error("Modulo by zero", node)
-            return a % b
+            # same sign rule as QUOSHUNT, so QUOSHUNT * b + MOD gives back a
+            if result_type == "NUMBAR":
+                return math.fmod(a, b)
+            return a - b * truncating_divide(a, b)
         if operator == "BIGGR OF":
             return max(a, b)
         if operator == "SMALLR OF":
