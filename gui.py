@@ -3,12 +3,14 @@
 #
 # parts of the window
 #     file explorer button on the top
+#     list of the test files on the far left
 #     text editor with line numbers on the left
 #     list of tokens in the middle
 #     symbol table and parse tree in tabs on the right
 #     execute button below the panels
 #     console at the bottom
 
+import os
 import tkinter as tk
 from tkinter import ttk, filedialog, scrolledtext, simpledialog
 
@@ -96,6 +98,16 @@ class LolInterpreterGUI:
         panels = tk.PanedWindow(self.root, orient="horizontal", bg=BACKGROUND)
         panels.pack(fill="both", expand=True, padx=5)
 
+        # leftmost list of the .lol files in tests/; clicking one loads it into the editor
+        self.tests_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests")
+        self.test_list = self.make_table(panels, ("Tests",))
+        self.test_list.column("Tests", width=160)
+        for name in sorted(os.listdir(self.tests_dir)):
+            if name.endswith(".lol"):
+                self.test_list.insert("", tk.END, values=(name,))
+        self.test_list.bind("<<TreeviewSelect>>", self.open_test_file)
+        panels.add(self.test_list.master)
+
         # container for line numbers + text editor
         editor_frame = tk.Frame(panels, bg=PANEL)
         self.editor = tk.Text(
@@ -169,9 +181,16 @@ class LolInterpreterGUI:
 
     def open_file(self):
         path = filedialog.askopenfilename(filetypes=[("LOLCode files", "*.lol")])
-        if not path:
-            return
+        if path:
+            self.load_file(path)
 
+    def open_test_file(self, event=None):
+        selected = self.test_list.selection()
+        if selected:
+            name = self.test_list.item(selected[0], "values")[0]
+            self.load_file(os.path.join(self.tests_dir, name))
+
+    def load_file(self, path):
         with open(path, "r") as source_file:
             content = source_file.read()
 
