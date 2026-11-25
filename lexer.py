@@ -98,16 +98,22 @@ KEYWORDS = {
     # shared by loops and functions
     "YR": "Parameter Marker",
     "AN": "Operand Separator",
+
+    # extra credit: a comma ends a statement and three dots join the next line
+    ",": "Soft Line Break",
+    "...": "Line Continuation",
+    "…": "Line Continuation",
 }
 
 # longest keywords are tried first so a multi word keyword wins over a shorter one
 SORTED_KEYWORDS = sorted(KEYWORDS, key=len, reverse=True)
 
 # keywords made of symbols may touch the lexeme before or after them
-SYMBOL_KEYWORDS = {"!", "+"}
+SYMBOL_KEYWORDS = {"!", "+", ",", "...", "…"}
+LINE_CONTINUATIONS = {"...", "…"}
 
 # a word stops at whitespace or at one of these characters
-WORD_ENDERS = '"!+'
+WORD_ENDERS = '"!+,…'
 
 # literal patterns from project requirement 1
 NUMBR_PATTERN = re.compile(r"-?[0-9]+")
@@ -132,19 +138,23 @@ class Token:
     lexeme: str
     classification: str
     line: int
+    # the statement the token belongs to; a comma starts a new one and ... continues one
+    statement: int
 
 
 # small helper functions
 
 # check if a character is whitespace or one of the word enders
-def is_word_end(character):
-    return character.isspace() or character in WORD_ENDERS
+def is_word_end(line, position):
+    return line[position].isspace() or line[position] in WORD_ENDERS or line.startswith("...", position)
 
 
 def keyword_ends_cleanly(line, end):
-    # a keyword must be followed by whitespace or the end of the line
+    # a keyword must be followed by whitespace, a comma, three dots or the end of the line
     # this stops the keyword R from matching the start of a name like result
-    return end == len(line) or line[end].isspace()
+    if end == len(line) or line[end].isspace() or line[end] in ",…":
+        return True
+    return line.startswith("...", end)
 
 # find a keyword in the line starting at the given position
 def find_keyword(line, position):
@@ -166,11 +176,20 @@ class Lexer:
         self.errors = []
         self.in_multiline_comment = False
         self.multiline_comment_start = 0
+        self.statement = 0
+        # the line number of a ... that joins the next line, or none
+        self.continued_from = None
 
     # main loop
 
     def tokenize(self):
         for line_number, line in enumerate(self.lines, start=1):
+            if self.continued_from is None:
+                self.statement += 1
+            elif not line.strip():
+                self.add_error(self.continued_from, "line continuation is followed by an empty line")
+            self.continued_from = None
+
             if self.in_multiline_comment:
                 self.scan_comment_line(line, line_number)
             else:
@@ -178,13 +197,15 @@ class Lexer:
 
         if self.in_multiline_comment:
             self.add_error(self.multiline_comment_start, "obtw has no matching tldr")
+        if self.continued_from is not None:
+            self.add_error(self.continued_from, "line continuation is followed by the end of the file")
 
         return self.tokens, self.errors
 
     # recording results
 
     def add_token(self, lexeme, classification, line_number):
-        self.tokens.append(Token(lexeme, classification, line_number))
+        self.tokens.append(Token(lexeme, classification, line_number, self.statement))
 
     def add_error(self, line_number, message):
         self.errors.append(f"line {line_number}: {message}")
@@ -193,6 +214,15 @@ class Lexer:
         # return the last token only if it is on the given line
         if self.tokens and self.tokens[-1].line == line_number:
             return self.tokens[-1]
+        return None
+
+    def previous_token_in_statement(self):
+        # like previous_token_on_line, but a ... carries the statement onto the next line
+        for token in reversed(self.tokens):
+            if token.statement != self.statement:
+                return None
+            if token.lexeme not in LINE_CONTINUATIONS:
+                return token
         return None
 
     # scanning a normal line
@@ -248,17 +278,30 @@ class Lexer:
             self.add_error(line_number, "tldr has no matching obtw")
             return end
 
+        if keyword == ",":
+            self.add_token(keyword, KEYWORDS[keyword], line_number)
+            self.statement += 1
+            return end
+
+        if keyword in LINE_CONTINUATIONS:
+            self.add_token(keyword, KEYWORDS[keyword], line_number)
+            if line[end:].strip():
+                self.add_error(line_number, f"{keyword} must be the last thing on its line")
+            else:
+                self.continued_from = line_number
+            return len(line)
+
         self.add_token(keyword, KEYWORDS[keyword], line_number)
         return end
 
     # scan a word
     def scan_word(self, line, position, line_number):
         end = position
-        while end < len(line) and not is_word_end(line[end]):
+        while end < len(line) and not is_word_end(line, end):
             end += 1
 
         word = line[position:end]
-        classification = self.classify_word(word, line_number)
+        classification = self.classify_word(word)
 
         if classification is None:
             self.add_error(line_number, f"unknown lexeme {word}")
@@ -267,8 +310,8 @@ class Lexer:
 
         return end
 
-    # classify a word using regexes and the previous token on the same line
-    def classify_word(self, word, line_number):
+    # classify a word using regexes and the previous token in the same statement
+    def classify_word(self, word):
         # numbar is checked before numbr so a decimal is never split
         if NUMBAR_PATTERN.fullmatch(word):
             return "Literal (NUMBAR)"
@@ -279,12 +322,12 @@ class Lexer:
         if word in TYPE_NAMES:
             return "Literal (TYPE)"
         if IDENTIFIER_PATTERN.fullmatch(word):
-            return self.identifier_kind(line_number)
+            return self.identifier_kind()
         return None
 
-    # determine the kind of identifier based on the previous token on the same line
-    def identifier_kind(self, line_number):
-        previous = self.previous_token_on_line(line_number)
+    # determine the kind of identifier based on the previous token in the same statement
+    def identifier_kind(self):
+        previous = self.previous_token_in_statement()
         if previous is None:
             return DEFAULT_IDENTIFIER_KIND
         return IDENTIFIER_KINDS.get(previous.lexeme, DEFAULT_IDENTIFIER_KIND)

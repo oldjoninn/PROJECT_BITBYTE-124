@@ -3,7 +3,9 @@
 
 
 # comments are ignored by the parser, the lexer already checked where they are
-COMMENT_CLASSES = {"Single Line Comment Delimiter", "Multi Line Comment Delimiter"}
+# soft line breaks and line continuations already set each token's statement number
+IGNORED_CLASSES = {"Single Line Comment Delimiter", "Multi Line Comment Delimiter",
+                   "Soft Line Break", "Line Continuation"}
 
 ARITHMETIC_OPERATORS = {"SUM OF", "DIFF OF", "PRODUKT OF", "QUOSHUNT OF",
                         "MOD OF", "BIGGR OF", "SMALLR OF"}

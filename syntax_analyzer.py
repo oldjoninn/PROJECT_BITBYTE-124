@@ -7,7 +7,7 @@
 import sys
 
 from keywords import (ARITHMETIC_OPERATORS, BINARY_BOOLEAN_OPERATORS, BLOCK_KEYWORDS,
-                      COMMENT_CLASSES, COMPARISON_OPERATORS, FUNCTION,
+                      COMPARISON_OPERATORS, FUNCTION, IGNORED_CLASSES,
                       INFINITE_BOOLEAN_OPERATORS, LITERAL_KINDS, LOOP, NAME_DESCRIPTIONS,
                       NOT_NESTABLE, TYPE, VARIABLE)
 from lexer import tokenize
@@ -23,7 +23,7 @@ class ParseError(Exception):
 # the main class that does the syntax analysis
 class Parser:
     def __init__(self, tokens):
-        self.tokens = [token for token in tokens if token.classification not in COMMENT_CLASSES]
+        self.tokens = [token for token in tokens if token.classification not in IGNORED_CLASSES]
         self.position = 0
         # used to check where FOUND YR and GTFO are allowed
         self.function_depth = 0
@@ -58,9 +58,11 @@ class Parser:
         return 1
 
     def on_current_line(self):
-        # true if the next token is on the same line as the last token read
+        # true if the next token is in the same statement as the last token read
+        # a statement is one line, unless a comma splits it or ... joins the next line
         token = self.peek()
-        return token is not None and self.position > 0 and token.line == self.previous_line()
+        return (token is not None and self.position > 0
+                and token.statement == self.tokens[self.position - 1].statement)
 
     def fail(self, message):
         token = self.peek()
@@ -173,7 +175,7 @@ class Parser:
         # a variable followed by R or IS NOW A on the same line
         token = self.peek()
         following = self.peek(1)
-        if token.classification == VARIABLE and following is not None and following.line == token.line:
+        if token.classification == VARIABLE and following is not None and following.statement == token.statement:
             if following.lexeme == "R":
                 return self.parse_assign()
             if following.lexeme == "IS NOW A":
@@ -289,7 +291,7 @@ class Parser:
         while self.on_current_line() and self.peek_lexeme() == "AN":
             # AN YR on the same line belongs to a function call around this list
             following = self.peek(1)
-            if following is not None and following.lexeme == "YR" and following.line == self.peek().line:
+            if following is not None and following.lexeme == "YR" and following.statement == self.peek().statement:
                 break
             self.position += 1
             operands.append(self.parse_operand(nested=True))
