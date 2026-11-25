@@ -28,6 +28,8 @@ class Parser:
         # used to check where FOUND YR and GTFO are allowed
         self.function_depth = 0
         self.gtfo_depth = 0
+        # inside a call a SMOOSH leaves a lone MKAY to the call
+        self.call_depth = 0
         # the keyword that starts a statement and the method that parses it
         self.statement_parsers = {
             "VISIBLE": self.parse_print,
@@ -252,7 +254,7 @@ class Parser:
         if lexeme in INFINITE_BOOLEAN_OPERATORS:
             return self.parse_infinite_bool()
         if lexeme == "SMOOSH":
-            return Node("concat", [self.take_operator()] + self.parse_operandlist())
+            return self.parse_concat()
         if lexeme == "MAEK":
             return self.parse_cast()
         if lexeme == "I IZ":
@@ -297,6 +299,22 @@ class Parser:
             operands.append(self.parse_operand(nested=True))
         return operands
 
+    # <concat> ::= SMOOSH <operandlist> | SMOOSH <operandlist> MKAY
+    def parse_concat(self):
+        node = Node("concat", [self.take_operator()] + self.parse_operandlist())
+        if self.on_current_line() and self.peek_lexeme() == "MKAY" and self.smoosh_owns_mkay():
+            node.children.append(self.keyword("MKAY"))
+        return node
+
+    def smoosh_owns_mkay(self):
+        # outside a call the MKAY can only close the SMOOSH
+        # inside a call it closes the SMOOSH only if the call still has its own MKAY or AN YR after it
+        if self.call_depth == 0:
+            return True
+        following = self.peek(1)
+        return (following is not None and following.statement == self.peek().statement
+                and following.lexeme in {"MKAY", "AN"})
+
     # <cast> ::= MAEK <inneroperand> A type | MAEK <inneroperand> type
     def parse_cast(self):
         node = Node("cast", [self.take_operator(), self.parse_operand(nested=True)])
@@ -310,6 +328,7 @@ class Parser:
     # <moreargs> ::= AN YR <operand> <moreargs> | ε
     def parse_call(self):
         node = Node("call", [self.take_operator(), self.identifier(FUNCTION, "funcident")])
+        self.call_depth += 1
         if self.on_current_line() and self.peek_lexeme() == "YR":
             self.position += 1
             node.children.append(self.parse_operand())
@@ -317,6 +336,7 @@ class Parser:
                 self.position += 1
                 self.keyword("YR")
                 node.children.append(self.parse_operand())
+        self.call_depth -= 1
         node.children.append(self.keyword("MKAY"))
         return node
 
