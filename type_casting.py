@@ -90,7 +90,7 @@ class TypeCaster:
             "NOOB": Value("NOOB", None),
             "NUMBR": Value("NUMBR", 0),
             "NUMBAR": Value("NUMBAR", 0.0),
-            "YARN": Value("YARN", ""),
+            "YARN": Value("YARN", "NOOB"),
         }
         return defaults[target_type]
 
