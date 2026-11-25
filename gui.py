@@ -3,7 +3,7 @@
 #
 # parts of the window
 #     file explorer button on the top
-#     text editor on the left
+#     text editor with line numbers on the left
 #     list of tokens in the middle
 #     symbol table and parse tree in tabs on the right
 #     execute button below the panels
@@ -23,9 +23,31 @@ from syntax_analyzer import parse
 BACKGROUND = "#1e1e1e"
 PANEL = "#252526"
 TEXT = "#d4d4d4"
+LINE_NUM = "#858585"
 BUTTON = "#3c3c3c"
 SELECTION = "#264f78"
 ERROR = "#f48771"
+
+
+class LineNumberCanvas(tk.Canvas):
+    def __init__(self, master, text_widget, **kwargs):
+        super().__init__(master, width=42, bg=PANEL, highlightthickness=0, bd=0, **kwargs)
+        self.text_widget = text_widget
+
+    def redraw(self, *args):
+        self.delete("all")
+        i = self.text_widget.index("@0,0")
+        while True:
+            dline = self.text_widget.dlineinfo(i)
+            if dline is None:
+                break
+            y = dline[1]
+            linenum = str(i).split(".")[0]
+            self.create_text(
+                36, y, anchor="ne", text=linenum,
+                fill=LINE_NUM, font=self.text_widget.cget("font")
+            )
+            i = self.text_widget.index(f"{i}+1line")
 
 
 class LolInterpreterGUI:
@@ -74,11 +96,26 @@ class LolInterpreterGUI:
         panels = tk.PanedWindow(self.root, orient="horizontal", bg=BACKGROUND)
         panels.pack(fill="both", expand=True, padx=5)
 
-        # insertbackground is the color of the typing cursor
-        self.editor = scrolledtext.ScrolledText(panels, width=40, undo=True,
-                                                bg=PANEL, fg=TEXT,
-                                                insertbackground=TEXT)
-        panels.add(self.editor)
+        # container for line numbers + text editor
+        editor_frame = tk.Frame(panels, bg=PANEL)
+        self.editor = tk.Text(
+            editor_frame, width=40, undo=True, wrap="none",
+            bg=PANEL, fg=TEXT, insertbackground=TEXT,
+            relief="flat", padx=6, pady=4
+        )
+        self.line_numbers = LineNumberCanvas(editor_frame, self.editor)
+        scrollbar = ttk.Scrollbar(editor_frame, orient="vertical", command=self._on_editor_scroll)
+        self.editor.configure(yscrollcommand=lambda *args: self._on_text_yscroll(scrollbar, *args))
+
+        self.line_numbers.pack(side="left", fill="y", pady=4)
+        self.editor.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        panels.add(editor_frame)
+
+        # keep line numbers synced on typing, mouse wheel, and resizing
+        for event in ("<KeyRelease>", "<MouseWheel>", "<Button-1>", "<Button-4>", "<Button-5>", "<Configure>"):
+            self.editor.bind(event, self._schedule_redraw)
+        self._schedule_redraw()
 
         self.token_table = self.make_table(panels, ("Lexeme", "Classification"))
         panels.add(self.token_table.master)
@@ -93,6 +130,17 @@ class LolInterpreterGUI:
         self.parse_tree_view.column("#0", width=300)
         self.right_tabs.add(self.parse_tree_view.master, text="Parse Tree")
         panels.add(self.right_tabs)
+
+    def _on_editor_scroll(self, *args):
+        self.editor.yview(*args)
+        self.line_numbers.redraw()
+
+    def _on_text_yscroll(self, scrollbar, *args):
+        scrollbar.set(*args)
+        self.line_numbers.redraw()
+
+    def _schedule_redraw(self, event=None):
+        self.root.after_idle(self.line_numbers.redraw)
 
     def make_table(self, parent, columns, show="headings"):
         frame = tk.Frame(parent, bg=BACKGROUND)
@@ -130,6 +178,7 @@ class LolInterpreterGUI:
         self.editor.delete("1.0", tk.END)
         self.editor.insert(tk.END, content)
         self.file_label.config(text=path)
+        self._schedule_redraw()
 
     def execute(self):
         # everything is refreshed every time the button is pressed
