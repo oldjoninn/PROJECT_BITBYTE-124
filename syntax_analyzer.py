@@ -445,10 +445,13 @@ class Parser:
 def parse(tokens):
     # returns the parse tree and a list of errors
     # the parser stops at the first syntax error so the list has at most one error
+    parser = Parser(tokens)
     try:
-        return Parser(tokens).parse_program(), []
+        return parser.parse_program(), []
     except ParseError as error:
         return None, [str(error)]
+    except RecursionError:
+        return None, [f"line {parser.previous_line()}: expression is nested too deeply"]
 
 
 # the main function for testing from the terminal
