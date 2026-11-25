@@ -1,0 +1,12 @@
+BTW fix 3: NUMBRs of any length keep every digit
+HAI
+    WAZZUP
+        I HAS A big ITZ 10000000000000000001
+        I HAS A text ITZ "12345678901234567890"
+    BUHBYE
+
+    VISIBLE QUOSHUNT OF big AN 1     BTW 10000000000000000001 (was ...000)
+    VISIBLE MAEK text A NUMBR        BTW 12345678901234567890 (was ...7168)
+    VISIBLE SUM OF big AN 1          BTW 10000000000000000002
+    VISIBLE MAEK "-3.7" A NUMBR      BTW -3, the decimals are still cut
+KTHXBYE
