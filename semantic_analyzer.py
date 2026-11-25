@@ -1,5 +1,7 @@
 # runs a lolcode parse tree by walking it node by node
 
+import sys
+
 from expressions import ExpressionEvaluator
 from runtime_values import BreakSignal, ReturnSignal, Scope, Value
 
@@ -15,12 +17,16 @@ class Interpreter(ExpressionEvaluator):
     def __init__(self, io_callbacks=None):
         if not io_callbacks:
             io_callbacks = {}
-        self.global_scope = Scope()
-        self.current_scope = self.global_scope
         # maps a function name to its funcdef node
         self.functions = {}
         self.output_cb = io_callbacks.get("output", print_without_newline)
         self.input_cb = io_callbacks.get("input", input)
+        self._reset_scopes()
+
+    # starts with only IT so the same interpreter can run a program again
+    def _reset_scopes(self):
+        self.global_scope = Scope()
+        self.current_scope = self.global_scope
         # it is the implicit variable that holds the last bare expression
         self.global_scope.declare("IT", Value("NOOB", None))
 
@@ -46,12 +52,18 @@ class Interpreter(ExpressionEvaluator):
 
         # register every function first so calls can come before definitions
         self.functions = {}
+        self._reset_scopes()
         self._collect_functions(root_node)
 
+        # each LOLCode call uses about 8 python frames, so the default limit of 1000 is too low
+        sys.setrecursionlimit(max(sys.getrecursionlimit(), 4000))
         # only declarations and statements are run
-        for child in root_node.children:
-            if child.kind == "declsection" or child.kind == "statements":
-                self.visit(child)
+        try:
+            for child in root_node.children:
+                if child.kind == "declsection" or child.kind == "statements":
+                    self.visit(child)
+        except RecursionError:
+            self._error("Too many nested function calls or expressions")
         return Value("NOOB", None)
 
     # finds every function definition anywhere in the tree and registers it
@@ -75,6 +87,14 @@ class Interpreter(ExpressionEvaluator):
         # two functions cannot share a name
         if name in self.functions:
             self._error(f"Function '{name}' is already defined", name_node)
+        # every parameter needs its own name so each argument has a variable to go into
+        seen = set()
+        for child in node.children:
+            if child.kind == "param":
+                parameter = self.get_node_lexeme(child)
+                if parameter in seen:
+                    self._error(f"Parameter '{parameter}' appears twice in function '{name}'", child)
+                seen.add(parameter)
         # store the whole node so a call can read its params and body
         self.functions[name] = node
 
@@ -446,13 +466,13 @@ class Interpreter(ExpressionEvaluator):
     def _make_function_scope(self, parameter_nodes, argument_nodes):
         # no parent so the function cannot see outside variables
         function_scope = Scope(parent=None)
-        # the function has its own it
-        function_scope.declare("IT", Value("NOOB", None))
         for index in range(len(parameter_nodes)):
             # arguments run in the caller scope because current_scope has not changed yet
             argument_value = self.visit(argument_nodes[index])
             parameter_name = self.get_node_lexeme(parameter_nodes[index])
             function_scope.declare(parameter_name, argument_value)
+        # the function has its own it, declared last so a parameter named IT keeps its argument
+        function_scope.declare("IT", Value("NOOB", None))
         return function_scope
 
     # runs the body in the function scope and always restores the caller scope

@@ -7,7 +7,7 @@
 import sys
 
 from keywords import (ARITHMETIC_OPERATORS, BINARY_BOOLEAN_OPERATORS, BLOCK_KEYWORDS,
-                      COMMENT_CLASSES, COMPARISON_OPERATORS, FUNCTION,
+                      COMPARISON_OPERATORS, FUNCTION, IGNORED_CLASSES,
                       INFINITE_BOOLEAN_OPERATORS, LITERAL_KINDS, LOOP, NAME_DESCRIPTIONS,
                       NOT_NESTABLE, TYPE, VARIABLE)
 from lexer import tokenize
@@ -23,11 +23,13 @@ class ParseError(Exception):
 # the main class that does the syntax analysis
 class Parser:
     def __init__(self, tokens):
-        self.tokens = [token for token in tokens if token.classification not in COMMENT_CLASSES]
+        self.tokens = [token for token in tokens if token.classification not in IGNORED_CLASSES]
         self.position = 0
         # used to check where FOUND YR and GTFO are allowed
         self.function_depth = 0
         self.gtfo_depth = 0
+        # inside a call a SMOOSH leaves a lone MKAY to the call
+        self.call_depth = 0
         # the keyword that starts a statement and the method that parses it
         self.statement_parsers = {
             "VISIBLE": self.parse_print,
@@ -58,9 +60,11 @@ class Parser:
         return 1
 
     def on_current_line(self):
-        # true if the next token is on the same line as the last token read
+        # true if the next token is in the same statement as the last token read
+        # a statement is one line, unless a comma splits it or ... joins the next line
         token = self.peek()
-        return token is not None and self.position > 0 and token.line == self.previous_line()
+        return (token is not None and self.position > 0
+                and token.statement == self.tokens[self.position - 1].statement)
 
     def fail(self, message):
         token = self.peek()
@@ -173,7 +177,7 @@ class Parser:
         # a variable followed by R or IS NOW A on the same line
         token = self.peek()
         following = self.peek(1)
-        if token.classification == VARIABLE and following is not None and following.line == token.line:
+        if token.classification == VARIABLE and following is not None and following.statement == token.statement:
             if following.lexeme == "R":
                 return self.parse_assign()
             if following.lexeme == "IS NOW A":
@@ -250,7 +254,7 @@ class Parser:
         if lexeme in INFINITE_BOOLEAN_OPERATORS:
             return self.parse_infinite_bool()
         if lexeme == "SMOOSH":
-            return Node("concat", [self.take_operator()] + self.parse_operandlist())
+            return self.parse_concat()
         if lexeme == "MAEK":
             return self.parse_cast()
         if lexeme == "I IZ":
@@ -289,11 +293,27 @@ class Parser:
         while self.on_current_line() and self.peek_lexeme() == "AN":
             # AN YR on the same line belongs to a function call around this list
             following = self.peek(1)
-            if following is not None and following.lexeme == "YR" and following.line == self.peek().line:
+            if following is not None and following.lexeme == "YR" and following.statement == self.peek().statement:
                 break
             self.position += 1
             operands.append(self.parse_operand(nested=True))
         return operands
+
+    # <concat> ::= SMOOSH <operandlist> | SMOOSH <operandlist> MKAY
+    def parse_concat(self):
+        node = Node("concat", [self.take_operator()] + self.parse_operandlist())
+        if self.on_current_line() and self.peek_lexeme() == "MKAY" and self.smoosh_owns_mkay():
+            node.children.append(self.keyword("MKAY"))
+        return node
+
+    def smoosh_owns_mkay(self):
+        # outside a call the MKAY can only close the SMOOSH
+        # inside a call it closes the SMOOSH only if the call still has its own MKAY or AN YR after it
+        if self.call_depth == 0:
+            return True
+        following = self.peek(1)
+        return (following is not None and following.statement == self.peek().statement
+                and following.lexeme in {"MKAY", "AN"})
 
     # <cast> ::= MAEK <inneroperand> A type | MAEK <inneroperand> type
     def parse_cast(self):
@@ -308,6 +328,7 @@ class Parser:
     # <moreargs> ::= AN YR <operand> <moreargs> | ε
     def parse_call(self):
         node = Node("call", [self.take_operator(), self.identifier(FUNCTION, "funcident")])
+        self.call_depth += 1
         if self.on_current_line() and self.peek_lexeme() == "YR":
             self.position += 1
             node.children.append(self.parse_operand())
@@ -315,6 +336,7 @@ class Parser:
                 self.position += 1
                 self.keyword("YR")
                 node.children.append(self.parse_operand())
+        self.call_depth -= 1
         node.children.append(self.keyword("MKAY"))
         return node
 
@@ -445,10 +467,13 @@ class Parser:
 def parse(tokens):
     # returns the parse tree and a list of errors
     # the parser stops at the first syntax error so the list has at most one error
+    parser = Parser(tokens)
     try:
-        return Parser(tokens).parse_program(), []
+        return parser.parse_program(), []
     except ParseError as error:
         return None, [str(error)]
+    except RecursionError:
+        return None, [f"line {parser.previous_line()}: expression is nested too deeply"]
 
 
 # the main function for testing from the terminal

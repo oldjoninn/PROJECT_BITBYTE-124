@@ -1,6 +1,7 @@
 # converts LOLCode values from one type to another, both explicitly (MAEK, IS NOW A) and implicitly.
 
 import math
+from decimal import Decimal
 
 from runtime_values import SemanticError, Value
 
@@ -130,7 +131,8 @@ class TypeCaster:
             self._error(f"Cannot cast YARN '{text}' to {target_type}", node)
         try:
             if target_type == "NUMBR":
-                return Value("NUMBR", int(float(text)))
+                # Decimal keeps every digit; int() still drops the decimal part
+                return Value("NUMBR", int(Decimal(text)))
             return Value("NUMBAR", float(text))
         except (ValueError, OverflowError):
             self._error(f"Cannot cast YARN '{text}' to {target_type}", node)
@@ -144,7 +146,8 @@ class TypeCaster:
             return Value("YARN", str(value.val))
         if value.type == "NUMBAR":
             # the spec cuts a NUMBAR to two decimals instead of rounding it
-            truncated = math.trunc(float(value.val) * 100) / 100
+            # round(..., 6) removes float noise first: 0.29 * 100 is 28.999999999999996
+            truncated = math.trunc(round(float(value.val) * 100, 6)) / 100
             return Value("YARN", f"{truncated:.2f}")
         return None
 
