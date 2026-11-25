@@ -21,7 +21,8 @@ each stage only runs when the stage before it found no errors
 10 sample programs
 11 project structure
 12 how it works
-13 known limitations
+13 bonus features
+14 known limitations
 
 ---
 
@@ -52,6 +53,7 @@ the window is in dark mode and has these parts
 
 | part | where | what it does |
 |---|---|---|
+| tests list | far left | lists every `.lol` file in `tests` and loads one into the editor when clicked |
 | open file | top right | opens a `.lol` file and loads it into the editor |
 | file label | top left | shows the path of the open file or `(None)` |
 | text editor | left | where the code is written or edited with line numbers on the side |
@@ -98,6 +100,16 @@ there is no terminal runner file but the interpreter can be called from python
     python -c "from lexer import tokenize; from syntax_analyzer import parse; from semantic_analyzer import Interpreter; t, e = tokenize(open('tests/09_loops.lol').read()); tree, e = parse(t); Interpreter().execute(tree)"
 
 `VISIBLE` prints to the terminal and `GIMMEH` reads from the keyboard
+
+### unit tests
+
+    python -m unittest discover tests
+
+runs every test in the `tests` folder which is 93 tests
+
+    python -m unittest tests.test_bonus -v
+
+runs only the bonus feature tests
 
 ## 6 writing a lolcode program
 
@@ -365,6 +377,9 @@ all lexical errors in the file are listed together
 | `tldr must be alone on its line` | code after `TLDR` that is not a `BTW` comment |
 | `obtw has no matching tldr` | the file ends inside a comment |
 | `tldr has no matching obtw` | a `TLDR` with no comment open |
+| `... must be the last thing on its line` | code after a line continuation |
+| `line continuation is followed by an empty line` | `...` with nothing on the next line |
+| `line continuation is followed by the end of the file` | `...` on the last line |
 
 ### syntax errors
 
@@ -415,6 +430,17 @@ all are in the `tests` folder and can be opened from the gui
 | `08_switch.lol` | switch case |
 | `09_loops.lol` | counting up and down with loops |
 | `10_functions.lol` | function definitions and calls |
+| `11_numbar_two_decimals.lol` | numbars print two decimals cut and not rounded |
+| `12_mod_negative.lol` | `MOD OF` with negative numbers |
+| `13_big_numbr.lol` | very long numbrs keep every digit |
+| `14_repeated_parameter.lol` | a function cannot repeat a parameter name |
+| `15_parameter_named_it.lol` | a parameter named `IT` |
+| `16_deep_recursion.lol` | deep recursion and runaway recursion |
+| `17_run_twice.lol` | running a program again starts from fresh variables |
+| `18_soft_line_breaks.lol` | bonus soft line breaks with `,` |
+| `19_line_continuation.lol` | bonus line continuation with `...` |
+| `20_yarn_special_characters.lol` | bonus special characters in a yarn |
+| `21_smoosh_mkay.lol` | `SMOOSH` with an optional `MKAY` |
 | `sample1.lol` `sample2.lol` | general programs |
 | `errors.lol` | lexical errors on purpose |
 
@@ -430,7 +456,11 @@ all are in the `tests` folder and can be opened from the gui
     expressions.py        evaluates expressions
     semantic_analyzer.py  runs statements flow control and functions and keeps the symbol table
     runtime_values.py     values scopes the semantic error and the return and break signals
-    tests/                sample lolcode programs
+    tests/                sample lolcode programs and unit tests
+    tests/test_parser.py      syntax analyzer tests
+    tests/test_failures.py    error cases and fixed bugs across the whole pipeline
+    tests/test_lol_files.py   runs the numbered sample programs 11 to 21
+    tests/test_bonus.py       bonus feature tests
 
 ## 12 how it works
 
@@ -464,9 +494,138 @@ variables live in scopes and a function call gets a new scope with no link to th
 `FOUND YR` and `GTFO` work by raising signals that the nearest function loop or switch catches
 python errors like dividing by zero are turned into semantic errors with a line number
 
-## 13 known limitations
+## 13 bonus features
+
+these are the extra credit features from section c3 of the project specifications
+each one lists where it is done in the code and a sample program that shows it
+
+| bonus from the specs | status | sample program |
+|---|---|---|
+| soft line breaks with `,` | done | `18_soft_line_breaks.lol` |
+| line continuation with `...` | done | `19_line_continuation.lol` |
+| special characters in a yarn | done | `20_yarn_special_characters.lol` |
+| suppress the newline with `!` | done | any `VISIBLE ... !` line |
+| `MEBBE` and else if clauses | done | `07_ifelse.lol` |
+| loop nesting | done | see below |
+| if else nesting | done | see below |
+| switch nesting | done | see below |
+| nesting of different flow control statements | done | see below |
+| arrays | not done | |
+
+### soft line breaks
+
+    VISIBLE x, VISIBLE y
+    x R 10, y R 20, VISIBLE SUM OF x AN y
+
+a comma ends a statement the same way a new line does
+
+how it works
+
+- `lexer.py` has `","` in `KEYWORDS` as a `Soft Line Break` and in `SYMBOL_KEYWORDS` so it can touch the word before it like `x,`
+- every `Token` now has a `statement` number and the lexer adds 1 to it at every new line and every comma
+- `syntax_analyzer.py` checks `token.statement` instead of `token.line` in `on_current_line` so a comma splits one line into two statements
+- the comma token itself is dropped by the parser through `IGNORED_CLASSES` in `keywords.py`
+- a comma inside a yarn is plain text because strings are scanned before keywords
+- error messages still show the real line number from `token.line`
+
+### line continuation
+
+    I HAS A total ITZ SUM OF 1 ...
+        AN 2
+
+a line that ends with `...` or the single character `…` goes on to the next line
+
+how it works
+
+- `lexer.py` has `"..."` and `"…"` in `KEYWORDS` as `Line Continuation`
+- when one is found the lexer saves the line in `continued_from` and the next line keeps the same `statement` number so the parser sees one statement
+- `previous_token_in_statement` skips the `...` token so `I IZ ...` on one line and the function name on the next is still read as a function name
+- `...` must be the last thing on its line or there is a lexical error
+- `...` followed by an empty line or the end of the file is also a lexical error
+- a numbar like `1.5` still works because `...` needs three dots in a row
+
+### special characters in a yarn
+
+| write | get |
+|---|---|
+| `:)` | new line |
+| `:>` | tab |
+| `:o` | bell |
+| `::` | one colon |
+| `:(1F431)` | the character with that hex code which here is a cat emoji |
+
+how it works
+
+- the lexer keeps the yarn text exactly as typed so the token table and parse tree show `:)`
+- `decode_yarn` in `expressions.py` turns the codes into real characters when `visit_yarn` runs
+- because of this the codes also work inside `SMOOSH` and in `OMG` cases
+- any other colon is left as typed so `"Value 1: "` prints normally
+- `:"` is not a code so `"x:" + WIN` still closes the yarn
+
+### suppress the newline
+
+    VISIBLE "no new line"!
+
+- the lexer has `!` as a `Newline Suppressor` and lets it touch the word before it
+- `parse_print` adds a `!` node at the end of the print
+- `visit_print` skips the newline when it sees that node
+
+### mebbe and else if
+
+    O RLY?
+        YA RLY
+            VISIBLE "one"
+        MEBBE BOTH SAEM x AN 2
+            VISIBLE "two"
+        NO WAI
+            VISIBLE "other"
+    OIC
+
+- `parse_ifelse` reads any number of `MEBBE` blocks each with its own condition
+- `visit_ifelse` runs `YA RLY` when `IT` is `WIN` and otherwise runs the first `MEBBE` whose condition is `WIN` and otherwise `NO WAI`
+
+### nesting of loops if else and switch
+
+    IM IN YR outer UPPIN YR i TIL BOTH SAEM i AN 2
+        IM IN YR inner UPPIN YR j TIL BOTH SAEM j AN 2
+            BOTH SAEM j AN 1
+            O RLY?
+                YA RLY
+                    i
+                    WTF?
+                        OMG 0
+                            VISIBLE "inner switch"
+                            GTFO
+                    OIC
+            OIC
+        IM OUTTA YR inner
+    IM OUTTA YR outer
+
+any flow control statement can be put inside any other one to any depth
+
+how it works
+
+- every block body is read by `parse_statements` and that can call `parse_ifelse` `parse_switch` or `parse_loop` again so nesting comes from the recursion
+- each loop checks that its closing name matches its opening name so `IM OUTTA YR` always closes the right loop
+- `GTFO` raises `BreakSignal` which is caught by the nearest loop switch or function only so a `GTFO` in an inner switch does not stop the outer loop
+- an if inside an if reads `IT` again so the inner one can have its own condition
+
+### smoosh with mkay
+
+the specs say `SMOOSH` does not need `MKAY` so this program also allows one
+
+    VISIBLE SMOOSH "a" AN "b" MKAY
+
+- `parse_concat` takes a `MKAY` after the operands when there is one
+- inside a function call `smoosh_owns_mkay` decides if the `MKAY` belongs to the `SMOOSH` or to the call
+
+### arrays
+
+arrays are not done
+
+## 14 known limitations
 
 - only the first syntax error is reported
 - `GIMMEH` from the terminal runner stops with a python error if there is no input left
-- there are no automated unit tests and testing is done with the sample programs
+- arrays are not supported
 - the editor has no save button so changes must be copied back to the file by hand
